@@ -140,19 +140,74 @@ class Grammar:
 
     def first_of_sequence(self, symbols: tuple[str, ...]) -> set[str]:
         """Calcule FIRST para uma sequência de zero ou mais símbolos."""
-        raise NotImplementedError("implemente FIRST de uma sequência")
+        # Sequência vazia deriva ε
+        if not symbols:
+            return {EPSILON}
+
+        result: set[str] = set()
+        for symbol in symbols:
+            if symbol in self.nonterminals:
+                symbol_first = self.first.get(symbol, set())
+            else:
+                # terminal (incluindo EPSILON se vier explicitamente)
+                symbol_first = {symbol}
+
+            result |= symbol_first - {EPSILON}
+            if EPSILON not in symbol_first:
+                return result  # símbolo não anulável → para aqui
+
+        # Todos os símbolos podem derivar ε
+        result.add(EPSILON)
+        return result
 
     def build_first(self) -> None:
         """Preencha self.first por iteração até um ponto fixo."""
-        raise NotImplementedError("implemente FIRST")
+        self.first = self._empty_sets_by_nonterminal()
+
+        changed = True
+        while changed:
+            changed = False
+            for production in self.productions:
+                nt = production.lhs
+                before = len(self.first[nt])
+                self.first[nt] |= self.first_of_sequence(production.rhs)
+                if len(self.first[nt]) != before:
+                    changed = True
 
     def build_follow(self) -> None:
         """Preencha self.follow; FIRST deve ter sido calculado antes."""
-        raise NotImplementedError("implemente FOLLOW")
+        self.follow = self._empty_sets_by_nonterminal()
+
+        # Símbolo inicial sempre tem EOF no FOLLOW
+        self.follow[self.start_symbol].add(EOF)
+
+        changed = True
+        while changed:
+            changed = False
+            for production in self.productions:
+                a = production.lhs
+                rhs = production.rhs
+                for i, symbol in enumerate(rhs):
+                    if symbol not in self.nonterminals:
+                        continue
+                    before = len(self.follow[symbol])
+                    beta = rhs[i + 1:]
+                    first_beta = self.first_of_sequence(beta)
+                    self.follow[symbol] |= first_beta - {EPSILON}
+                    if EPSILON in first_beta:
+                        self.follow[symbol] |= self.follow[a]
+                    if len(self.follow[symbol]) != before:
+                        changed = True
 
     def build_start(self) -> None:
         """Associe a cada produção seu conjunto START."""
-        raise NotImplementedError("implemente START")
+        self.start = {}
+        for production in self.productions:
+            first_rhs = self.first_of_sequence(production.rhs)
+            start_set = first_rhs - {EPSILON}
+            if EPSILON in first_rhs:
+                start_set |= self.follow[production.lhs]
+            self.start[production] = start_set
 
     def build_sets(self) -> None:
         self.build_first()
@@ -161,7 +216,33 @@ class Grammar:
 
     def eliminate_direct_left_recursion(self, nonterminal: str) -> bool:
         """Elimine a recursão direta de um não terminal, se existir."""
-        raise NotImplementedError("implemente a remoção de recursão direta")
+        productions = self.productions_for(nonterminal)
+
+        # Separa produções recursivas (A → A α) das não-recursivas (A → β)
+        recursive: list[tuple[str, ...]] = []   # os α
+        non_recursive: list[tuple[str, ...]] = []  # os β
+
+        for prod in productions:
+            if prod.rhs and prod.rhs[0] == nonterminal:
+                recursive.append(prod.rhs[1:])  # α (sem o A inicial)
+            else:
+                non_recursive.append(prod.rhs)
+
+        if not recursive:
+            return False  # sem recursão direta
+
+        # Cria o novo não-terminal A'
+        prime = self._fresh_nonterminal(nonterminal)
+        self._insert_nonterminal_after(nonterminal, prime)
+
+        # A  → β₁ A' | β₂ A' | ...
+        new_a = [beta + (prime,) for beta in non_recursive]
+        # A' → α₁ A' | α₂ A' | ... | ε
+        new_prime = [alpha + (prime,) for alpha in recursive] + [()]
+
+        self._replace_productions(nonterminal, new_a)
+        self._replace_productions(prime, new_prime)
+        return True
 
     def eliminate_all_direct_left_recursion(self) -> None:
         for nonterminal in list(self.nonterminals):
