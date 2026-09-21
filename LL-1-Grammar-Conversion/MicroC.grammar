@@ -1,0 +1,34 @@
+# Gramática concreta da MicroC antes das transformações para LL(1).
+# Os terminais usam exatamente os nomes publicados em TokenKind.
+
+program ::= function_list
+function_list ::= function function_list | ε
+function ::= type IDENTIFIER LEFT_PAREN params RIGHT_PAREN block
+type ::= KW_INT | KW_BOOL | KW_VOID
+params ::= parameter_list | ε
+parameter_list ::= parameter_list COMMA type IDENTIFIER | type IDENTIFIER
+
+block ::= LEFT_BRACE statement_list RIGHT_BRACE
+statement_list ::= statement statement_list | ε
+statement ::= declaration | id_or_call_statement | if_statement | while_statement | return_statement | print_statement | block
+id_or_call_statement ::= IDENTIFIER ASSIGN expression SEMICOLON | IDENTIFIER LEFT_PAREN arguments RIGHT_PAREN SEMICOLON
+declaration ::= type IDENTIFIER SEMICOLON | type IDENTIFIER ASSIGN expression SEMICOLON
+if_statement ::= KW_IF LEFT_PAREN expression RIGHT_PAREN block KW_ELSE block | KW_IF LEFT_PAREN expression RIGHT_PAREN block
+while_statement ::= KW_WHILE LEFT_PAREN expression RIGHT_PAREN block
+return_statement ::= KW_RETURN expression SEMICOLON | KW_RETURN SEMICOLON
+print_statement ::= KW_PRINT LEFT_PAREN print_items RIGHT_PAREN SEMICOLON
+print_items ::= print_item COMMA print_items | print_item
+print_item ::= expression | string_literals
+string_literals ::= string_literals STRING_LITERAL | STRING_LITERAL
+
+expression ::= logical_or
+logical_or ::= logical_or LOGICAL_OR logical_and | logical_and
+logical_and ::= logical_and LOGICAL_AND equality | equality
+equality ::= equality EQUAL_EQUAL relational | equality NOT_EQUAL relational | relational
+relational ::= relational LESS additive | relational LESS_EQUAL additive | relational GREATER additive | relational GREATER_EQUAL additive | additive
+additive ::= additive PLUS multiplicative | additive MINUS multiplicative | multiplicative
+multiplicative ::= multiplicative STAR unary | multiplicative SLASH unary | multiplicative PERCENT unary | unary
+unary ::= LOGICAL_NOT unary | MINUS unary | primary
+primary ::= LEFT_PAREN expression RIGHT_PAREN | IDENTIFIER LEFT_PAREN arguments RIGHT_PAREN | IDENTIFIER | INT_LITERAL | KW_TRUE | KW_FALSE
+arguments ::= argument_list | ε
+argument_list ::= argument_list COMMA expression | expression
