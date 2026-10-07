@@ -1,0 +1,41 @@
+# Gramática LL(1) da MicroC em EBNF.
+# Terminais usam os nomes publicados em TokenKind. Nomes minúsculos são
+# não terminais. EOF é consumido explicitamente pela produção inicial.
+
+program ::= function* EOF
+function ::= type IDENTIFIER LEFT_PAREN parameter_list? RIGHT_PAREN block
+type ::= KW_INT | KW_BOOL | KW_VOID
+parameter_list ::= parameter (COMMA parameter)*
+parameter ::= type IDENTIFIER
+
+block ::= LEFT_BRACE statement* RIGHT_BRACE
+statement ::= declaration
+            | id_or_call_statement
+            | if_statement
+            | while_statement
+            | return_statement
+            | print_statement
+            | block
+id_or_call_statement ::= IDENTIFIER (ASSIGN expression | LEFT_PAREN arguments RIGHT_PAREN) SEMICOLON
+declaration ::= type IDENTIFIER (ASSIGN expression)? SEMICOLON
+if_statement ::= KW_IF LEFT_PAREN expression RIGHT_PAREN block (KW_ELSE block)?
+while_statement ::= KW_WHILE LEFT_PAREN expression RIGHT_PAREN block
+return_statement ::= KW_RETURN expression? SEMICOLON
+print_statement ::= KW_PRINT LEFT_PAREN print_item (COMMA print_item)* RIGHT_PAREN SEMICOLON
+print_item ::= expression | string_literals
+string_literals ::= STRING_LITERAL+
+
+expression ::= logical_or
+logical_or ::= logical_and (LOGICAL_OR logical_and)*
+logical_and ::= equality (LOGICAL_AND equality)*
+equality ::= relational ((EQUAL_EQUAL | NOT_EQUAL) relational)*
+relational ::= additive ((LESS | LESS_EQUAL | GREATER | GREATER_EQUAL) additive)*
+additive ::= multiplicative ((PLUS | MINUS) multiplicative)*
+multiplicative ::= unary ((STAR | SLASH | PERCENT) unary)*
+unary ::= (LOGICAL_NOT | MINUS) unary | primary
+primary ::= LEFT_PAREN expression RIGHT_PAREN
+          | IDENTIFIER (LEFT_PAREN arguments RIGHT_PAREN)?
+          | INT_LITERAL
+          | KW_TRUE
+          | KW_FALSE
+arguments ::= (expression (COMMA expression)*)?
